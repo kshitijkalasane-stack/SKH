@@ -7,15 +7,21 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -29,6 +35,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import com.example.data.ProjectWithDetails
 import com.example.ui.GramVikasViewModel
+import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -40,10 +47,15 @@ fun ProjectsScreen(
     onNavigateToDashboard: () -> Unit,
     onNavigateToContractors: () -> Unit,
     onNavigateToSettings: () -> Unit,
+    onNavigateToIssues: () -> Unit,
+    onLogout: () -> Unit,
     onProjectClick: (Int) -> Unit
 ) {
     val projectsWithDetails by viewModel.allProjectsWithDetails.collectAsStateWithLifecycle()
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+    var showAddProjectDialog by remember { mutableStateOf(false) }
 
     var selectedFilter by remember { mutableStateOf("All") }
     val filters = listOf("All", "In Progress", "Delayed", "Completed")
@@ -56,29 +68,90 @@ fun ProjectsScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Ongoing Projects", fontWeight = FontWeight.Bold) },
-                actions = {
-                    IconButton(onClick = onNavigateToContractors) {
-                        Icon(Icons.Default.Groups, contentDescription = "Contractors")
-                    }
-                    IconButton(onClick = onNavigateToDashboard) {
-                        Icon(Icons.Default.Dashboard, contentDescription = "Dashboard")
-                    }
-                    IconButton(onClick = onNavigateToSettings) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings")
-                    }
-                }
-            )
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            ModalDrawerSheet {
+                Spacer(Modifier.height(16.dp))
+                Text("GramVikas Menu", modifier = Modifier.padding(16.dp), style = MaterialTheme.typography.titleLarge)
+                HorizontalDivider()
+                NavigationDrawerItem(
+                    label = { Text("Project Progress") },
+                    selected = false,
+                    onClick = { scope.launch { drawerState.close() } },
+                    icon = { Icon(Icons.Default.Dashboard, contentDescription = null) },
+                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                )
+                NavigationDrawerItem(
+                    label = { Text("Daily Report") },
+                    selected = false,
+                    onClick = { scope.launch { drawerState.close() } },
+                    icon = { Icon(Icons.Default.Assessment, contentDescription = null) },
+                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                )
+                NavigationDrawerItem(
+                    label = { Text("Daily Update by Camera") },
+                    selected = false,
+                    onClick = { scope.launch { drawerState.close() } },
+                    icon = { Icon(Icons.Default.PhotoCamera, contentDescription = null) },
+                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                )
+                NavigationDrawerItem(
+                    label = { Text("Public Issues / Reports") },
+                    selected = false,
+                    onClick = { 
+                        scope.launch { drawerState.close() }
+                        onNavigateToIssues()
+                    },
+                    icon = { Icon(Icons.Default.Assessment, contentDescription = null) },
+                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                HorizontalDivider()
+                NavigationDrawerItem(
+                    label = { Text("Logout") },
+                    selected = false,
+                    onClick = { 
+                        scope.launch { drawerState.close() }
+                        onLogout()
+                    },
+                    icon = { Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = "Logout") },
+                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding).padding(bottom = 16.dp)
+                )
+            }
         }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
+    ) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text("Ongoing Projects", fontWeight = FontWeight.Bold) },
+                    navigationIcon = {
+                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                            Icon(Icons.Default.Menu, contentDescription = "Menu")
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = { showAddProjectDialog = true }) {
+                            Icon(Icons.Default.Add, contentDescription = "Add New Project")
+                        }
+                        IconButton(onClick = onNavigateToContractors) {
+                            Icon(Icons.Default.Groups, contentDescription = "Contractors")
+                        }
+                        IconButton(onClick = onNavigateToDashboard) {
+                            Icon(Icons.Default.Dashboard, contentDescription = "Dashboard")
+                        }
+                        IconButton(onClick = onNavigateToSettings) {
+                            Icon(Icons.Default.Settings, contentDescription = "Settings")
+                        }
+                    }
+                )
+            }
+        ) { padding ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+            ) {
             LazyRow(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -112,6 +185,77 @@ fun ProjectsScreen(
             }
         }
     }
+
+    if (showAddProjectDialog) {
+        AddProjectDialog(
+            onDismiss = { showAddProjectDialog = false },
+            onAdd = { name, location, desc, budget ->
+                viewModel.addNewProject(name, location, desc, budget)
+                showAddProjectDialog = false
+            }
+        )
+    }
+}
+}
+
+@Composable
+fun AddProjectDialog(
+    onDismiss: () -> Unit,
+    onAdd: (String, String, String, Double) -> Unit
+) {
+    var name by remember { mutableStateOf("") }
+    var location by remember { mutableStateOf("") }
+    var description by remember { mutableStateOf("") }
+    var budget by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Add New Project") },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Project Name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                )
+                OutlinedTextField(
+                    value = location,
+                    onValueChange = { location = it },
+                    label = { Text("Location") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                )
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text("Description") },
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                )
+                OutlinedTextField(
+                    value = budget,
+                    onValueChange = { budget = it },
+                    label = { Text("Planned Budget") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = { 
+                val budgetValue = budget.toDoubleOrNull() ?: 0.0
+                onAdd(name, location, description, budgetValue) 
+            }) {
+                Text("Add Project")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }
 
 @Composable

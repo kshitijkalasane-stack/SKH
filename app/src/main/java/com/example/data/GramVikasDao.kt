@@ -50,4 +50,10 @@ interface GramVikasDao {
 
     @Update
     suspend fun updateProject(project: Project)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertPublicIssue(issue: PublicIssue)
+
+    @Query("SELECT * FROM public_issues ORDER BY timestamp DESC")
+    fun getAllPublicIssues(): Flow<List<PublicIssue>>
 }

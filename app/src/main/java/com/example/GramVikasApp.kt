@@ -29,7 +29,31 @@ fun GramVikasApp(repository: GramVikasRepository) {
         composable("public_home") {
             com.example.ui.home.PublicHomeScreen(
                 viewModel = viewModel,
-                onLoginClick = { navController.navigate("projects") }
+                onLoginClick = { navController.navigate("login") },
+                onReportIssueClick = { navController.navigate("report_issue") }
+            )
+        }
+        composable("report_issue") {
+            com.example.ui.camera.CameraCaptureScreen(
+                onPhotoCaptured = { uri, location ->
+                    viewModel.insertPublicIssue(
+                        description = "Reported by Citizen via Photo Terminal",
+                        photoUri = uri.toString(),
+                        location = location
+                    )
+                    navController.popBackStack()
+                },
+                onCancel = { navController.popBackStack() }
+            )
+        }
+        composable("login") {
+            com.example.ui.login.LoginScreen(
+                onLoginSuccess = { 
+                    navController.navigate("projects") {
+                        popUpTo("public_home")
+                    }
+                },
+                onBack = { navController.popBackStack() }
             )
         }
         composable("dashboard") {
@@ -46,7 +70,15 @@ fun GramVikasApp(repository: GramVikasRepository) {
                 onNavigateToDashboard = { navController.navigate("dashboard") },
                 onNavigateToContractors = { navController.navigate("contractors") },
                 onNavigateToSettings = { navController.navigate("settings") },
+                onNavigateToIssues = { navController.navigate("issues") },
+                onLogout = { navController.popBackStack("public_home", inclusive = false) },
                 onProjectClick = { projectId -> navController.navigate("project_details/$projectId") }
+            )
+        }
+        composable("issues") {
+            com.example.ui.issues.PublicIssuesScreen(
+                viewModel = viewModel,
+                onBack = { navController.popBackStack() }
             )
         }
         composable(

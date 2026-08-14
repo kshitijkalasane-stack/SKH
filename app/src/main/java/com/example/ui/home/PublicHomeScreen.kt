@@ -16,6 +16,10 @@ import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,7 +44,8 @@ val CardYellowHeader = Color(0xFFB57A24)
 @Composable
 fun PublicHomeScreen(
     viewModel: GramVikasViewModel,
-    onLoginClick: () -> Unit
+    onLoginClick: () -> Unit,
+    onReportIssueClick: () -> Unit
 ) {
     val projectsWithDetails by viewModel.allProjectsWithDetails.collectAsStateWithLifecycle()
     val totalProjects = projectsWithDetails.size
@@ -223,6 +228,7 @@ fun PublicHomeScreen(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(16.dp))
                         .background(CardYellowBg)
+                        .clickable { onReportIssueClick() }
                         .padding(24.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -271,46 +277,16 @@ fun PublicHomeScreen(
                     )
                 }
             }
-
-            // Project Summary Headers
-            item {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "Project Summary",
-                    fontFamily = FontFamily.Serif,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 24.sp,
-                    color = Color(0xFF222222)
-                )
-            }
-
-            // Summary Cards
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    SummaryCard(
-                        title = "Total Projects",
-                        value = totalProjects.toString(),
-                        icon = Icons.Default.Folder,
-                        modifier = Modifier.weight(1f)
-                    )
-                    SummaryCard(
-                        title = "Active Projects",
-                        value = activeProjects.toString(),
-                        icon = Icons.Outlined.CheckCircle,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-                Spacer(modifier = Modifier.height(32.dp))
-            }
         }
     }
 }
 
 @Composable
 fun PublicTopBar(onLoginClick: () -> Unit) {
+    var languageMenuExpanded by remember { mutableStateOf(false) }
+    var selectedLanguage by remember { mutableStateOf("मराठी") }
+    val regionalLanguages = listOf("English", "मराठी", "हिन्दी", "ગુજરાતી", "ಕನ್ನಡ", "தமிழ்", "తెలుగు")
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -338,14 +314,34 @@ fun PublicTopBar(onLoginClick: () -> Unit) {
         }
         
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            // Marathi Outline Button
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(20.dp))
-                    .border(1.dp, Color(0xFFA0C2B0), RoundedCornerShape(20.dp))
-                    .padding(horizontal = 12.dp, vertical = 6.dp)
-            ) {
-                Text(text = "मराठी", color = Color.White, fontSize = 12.sp)
+            // Regional Language Dropdown
+            Box {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .border(1.dp, Color(0xFFA0C2B0), RoundedCornerShape(20.dp))
+                        .clickable { languageMenuExpanded = true }
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(text = selectedLanguage, color = Color.White, fontSize = 12.sp)
+                        Icon(imageVector = Icons.Default.ArrowDropDown, contentDescription = "Select Language", tint = Color.White, modifier = Modifier.size(16.dp))
+                    }
+                }
+                DropdownMenu(
+                    expanded = languageMenuExpanded,
+                    onDismissRequest = { languageMenuExpanded = false }
+                ) {
+                    regionalLanguages.forEach { language ->
+                        DropdownMenuItem(
+                            text = { Text(language) },
+                            onClick = {
+                                selectedLanguage = language
+                                languageMenuExpanded = false
+                            }
+                        )
+                    }
+                }
             }
             
             // Login Fill Button

@@ -31,7 +31,13 @@ class GramVikasRepository(private val dao: GramVikasDao) {
         dao.insertExpense(expense)
     }
 
+    val allPublicIssues: Flow<List<PublicIssue>> = dao.getAllPublicIssues()
+
     suspend fun insertContractor(contractor: Contractor) {
         dao.insertContractor(contractor)
+    }
+
+    suspend fun insertPublicIssue(issue: PublicIssue) {
+        dao.insertPublicIssue(issue)
     }
 }

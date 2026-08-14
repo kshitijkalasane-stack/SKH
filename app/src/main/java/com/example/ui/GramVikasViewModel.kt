@@ -34,6 +34,21 @@ class GramVikasViewModel(private val repository: GramVikasRepository) : ViewMode
         _budgetOverrunAlertsEnabled.value = enabled
     }
 
+    val allPublicIssues: StateFlow<List<PublicIssue>> = repository.allPublicIssues
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun insertPublicIssue(description: String, photoUri: String, location: String?) {
+        viewModelScope.launch {
+            val issue = PublicIssue(
+                description = description,
+                photoUri = photoUri,
+                location = location,
+                timestamp = System.currentTimeMillis()
+            )
+            repository.insertPublicIssue(issue)
+        }
+    }
+
     val allProjects: StateFlow<List<Project>> = repository.allProjects
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -95,6 +110,23 @@ class GramVikasViewModel(private val repository: GramVikasRepository) : ViewMode
             
             repository.insertExpense(Expense(projectId = p2Id, amount = 300000.0, date = now - 45L * 24 * 60 * 60 * 1000, purpose = "Foundation Material"))
             repository.insertExpense(Expense(projectId = p2Id, amount = 250000.0, date = now - 30L * 24 * 60 * 60 * 1000, purpose = "Structure Cost")) // This will make actual spend > planned (550k > 500k)
+        }
+    }
+
+    fun addNewProject(name: String, location: String, description: String, budget: Double) {
+        viewModelScope.launch {
+            val now = System.currentTimeMillis()
+            val thirtyDays = 30L * 24 * 60 * 60 * 1000
+            val p = com.example.data.Project(
+                name = name,
+                location = location,
+                description = description,
+                status = "In Progress",
+                plannedBudget = budget,
+                startDate = now,
+                estimatedEndDate = now + thirtyDays
+            )
+            repository.insertProject(p)
         }
     }
 }

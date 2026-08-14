@@ -50,3 +50,13 @@ data class Contractor(
     val rating: Float,
     val activeProjectsCount: Int = 0
 )
+
+@Entity(tableName = "public_issues")
+data class PublicIssue(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val description: String,
+    val photoUri: String,
+    val location: String?,
+    val timestamp: Long,
+    val status: String = "Open"
+)
