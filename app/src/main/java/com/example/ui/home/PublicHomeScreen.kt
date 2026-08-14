@@ -66,33 +66,6 @@ fun PublicHomeScreen(
         ) {
             item { Spacer(modifier = Modifier.height(8.dp)) }
 
-            // Disclaimer Banner
-            item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(WarningBg)
-                        .border(1.dp, WarningBorder, RoundedCornerShape(8.dp))
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.Top
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Info,
-                        contentDescription = null,
-                        tint = WarningText,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        text = "This prototype uses fictional static demo information. It is not an official government record.",
-                        color = WarningText,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-            }
-
             // Live Dashboard Pill
             item {
                 Row(
