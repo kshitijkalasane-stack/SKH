@@ -12,10 +12,18 @@ import kotlinx.coroutines.launch
 import java.util.Calendar
 
 import kotlinx.coroutines.flow.MutableStateFlow
+import com.example.ui.login.Role
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.delay
 
 class GramVikasViewModel(private val repository: GramVikasRepository) : ViewModel() {
+
+    private val _currentRole = MutableStateFlow(Role.ADMIN)
+    val currentRole: StateFlow<Role> = _currentRole.asStateFlow()
+
+    fun setCurrentRole(role: Role) {
+        _currentRole.value = role
+    }
 
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
@@ -36,6 +44,31 @@ class GramVikasViewModel(private val repository: GramVikasRepository) : ViewMode
 
     val allPublicIssues: StateFlow<List<PublicIssue>> = repository.allPublicIssues
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val allDailyReports: StateFlow<List<DailyReport>> = repository.allDailyReports
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun insertDailyReport(
+        siteName: String,
+        cropStatus: String,
+        waterLevel: String,
+        laborCount: Int,
+        weatherCondition: String,
+        fieldNotes: String
+    ) {
+        viewModelScope.launch {
+            val report = DailyReport(
+                date = System.currentTimeMillis(),
+                siteName = siteName,
+                cropStatus = cropStatus,
+                waterLevel = waterLevel,
+                laborCount = laborCount,
+                weatherCondition = weatherCondition,
+                fieldNotes = fieldNotes
+            )
+            repository.insertDailyReport(report)
+        }
+    }
 
     fun insertPublicIssue(description: String, photoUri: String, location: String?) {
         viewModelScope.launch {

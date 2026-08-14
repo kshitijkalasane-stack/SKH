@@ -37,7 +37,7 @@ enum class Role(val title: String, val defaultPass: String, val icon: ImageVecto
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen(
-    onLoginSuccess: () -> Unit,
+    onLoginSuccess: (Role) -> Unit,
     onBack: () -> Unit
 ) {
     var selectedRole by remember { mutableStateOf(Role.ADMIN) }
@@ -204,7 +204,7 @@ fun LoginScreen(
             Button(
                 onClick = {
                     if (password == selectedRole.defaultPass) {
-                        onLoginSuccess()
+                        onLoginSuccess(selectedRole)
                     } else {
                         errorMessage = "Incorrect access key for ${selectedRole.title}"
                     }

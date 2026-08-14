@@ -56,4 +56,10 @@ interface GramVikasDao {
 
     @Query("SELECT * FROM public_issues ORDER BY timestamp DESC")
     fun getAllPublicIssues(): Flow<List<PublicIssue>>
+
+    @Query("SELECT * FROM daily_reports ORDER BY date DESC")
+    fun getAllDailyReports(): Flow<List<DailyReport>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertDailyReport(report: DailyReport)
 }

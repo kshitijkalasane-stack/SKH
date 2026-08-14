@@ -60,3 +60,15 @@ data class PublicIssue(
     val timestamp: Long,
     val status: String = "Open"
 )
+
+@Entity(tableName = "daily_reports")
+data class DailyReport(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val date: Long,
+    val siteName: String,
+    val cropStatus: String,
+    val waterLevel: String,
+    val laborCount: Int,
+    val weatherCondition: String,
+    val fieldNotes: String
+)

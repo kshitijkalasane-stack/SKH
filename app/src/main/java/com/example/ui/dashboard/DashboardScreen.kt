@@ -1,36 +1,33 @@
 package com.example.ui.dashboard
 
-import androidx.compose.foundation.Image
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.ProjectWithDetails
 import com.example.ui.GramVikasViewModel
+import com.example.ui.login.Role
+import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.util.Locale
-import com.example.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -38,461 +35,645 @@ fun DashboardScreen(
     viewModel: GramVikasViewModel,
     onNavigateToProjects: () -> Unit,
     onNavigateToContractors: () -> Unit,
-    onProjectClick: (Int) -> Unit
+    onProjectClick: (Int) -> Unit,
+    onNavigateToDailyReports: () -> Unit,
+    onNavigateToIssues: () -> Unit,
+    onNavigateToSettings: () -> Unit,
+    onLogout: () -> Unit
 ) {
     val projectsWithDetails by viewModel.allProjectsWithDetails.collectAsStateWithLifecycle()
     val contractors by viewModel.allContractors.collectAsStateWithLifecycle()
+    val publicIssues by viewModel.allPublicIssues.collectAsStateWithLifecycle()
+    val currentRole by viewModel.currentRole.collectAsStateWithLifecycle()
+
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+
     val currencyFormatter = NumberFormat.getCurrencyInstance(Locale("en", "IN"))
 
     val totalBudget = projectsWithDetails.sumOf { it.project.plannedBudget }
+    val totalExpenses = projectsWithDetails.sumOf { pwd -> pwd.expenses.sumOf { it.amount } }
     val delayedProjects = projectsWithDetails.count { it.project.status == "Delayed" }
     val completedProjects = projectsWithDetails.count { it.project.status == "Completed" }
     val inProgressProjects = projectsWithDetails.count { it.project.status == "In Progress" }
     val planningProjects = projectsWithDetails.count { it.project.status == "Planning" }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        Image(
-            painter = painterResource(id = R.drawable.img_dashboard_bg_1786716210155),
-            contentDescription = null,
-            modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop
-        )
-        // Dark translucent overlay for maximum contrast
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.45f))
-        )
+    val allMilestones = projectsWithDetails.flatMap { it.milestones }
+    val totalMilestones = allMilestones.size
+    val completedMilestones = allMilestones.count { it.isCompleted }
+    val overdueMilestones = allMilestones.filter { !it.isCompleted && it.expectedCompletionDate < System.currentTimeMillis() }
 
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            GramVikasDrawerContent(
+                currentRole = currentRole,
+                onNavigateToDailyReports = onNavigateToDailyReports,
+                onNavigateToProjects = onNavigateToProjects,
+                onNavigateToContractors = onNavigateToContractors,
+                onNavigateToIssues = onNavigateToIssues,
+                onNavigateToSettings = onNavigateToSettings,
+                onLogout = onLogout,
+                onCloseDrawer = { scope.launch { drawerState.close() } }
+            )
+        }
+    ) {
         Scaffold(
-            containerColor = Color.Transparent,
+            containerColor = MaterialTheme.colorScheme.background,
             topBar = {
                 TopAppBar(
                     title = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(32.dp)
-                                    .clip(CircleShape)
-                                    .background(
-                                        Brush.linearGradient(
-                                            listOf(Color(0xFF3B82F6), Color(0xFFEC4899))
-                                        )
-                                    ),
-                                contentAlignment = Alignment.Center
+                            Surface(
+                                modifier = Modifier.size(36.dp),
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.primaryContainer
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.Dashboard,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(18.dp)
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = currentRole.icon,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    "GramVikas Dashboard",
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    fontSize = 18.sp
+                                )
+                                Text(
+                                    "${currentRole.title} Portal",
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Text("GramVikas Dashboard", fontWeight = FontWeight.ExtraBold, color = Color.White)
+                        }
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                            Icon(Icons.Default.Menu, contentDescription = "Open Slidebar Drawer", tint = MaterialTheme.colorScheme.onSurface)
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color.Transparent,
-                        titleContentColor = Color.White
+                        containerColor = MaterialTheme.colorScheme.surface
                     )
                 )
             }
         ) { padding ->
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(18.dp)
-            ) {
-                item { Spacer(modifier = Modifier.height(4.dp)) }
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            item { Spacer(modifier = Modifier.height(4.dp)) }
 
-                // Hero Welcome Banner with Vibrant Gradient
-                item {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(24.dp),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(
-                                    Brush.horizontalGradient(
-                                        listOf(
-                                            Color(0xFF4F46E5), // Indigo
-                                            Color(0xFF7C3AED), // Purple
-                                            Color(0xFF06B6D4)  // Cyan
-                                        )
-                                    )
-                                )
-                                .padding(22.dp)
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Surface(
-                                        color = Color.White.copy(alpha = 0.25f),
-                                        shape = RoundedCornerShape(20.dp)
-                                    ) {
-                                        Text(
-                                            " ADMIN & ENGINEER PORTAL ",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color.White,
-                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                                        )
-                                    }
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text(
-                                        "Welcome Back!",
-                                        style = MaterialTheme.typography.headlineSmall,
-                                        fontWeight = FontWeight.Black,
-                                        color = Color.White
-                                    )
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        "Real-time village infrastructure & project intelligence.",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = Color.White.copy(alpha = 0.9f)
-                                    )
-                                }
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Box(
-                                    modifier = Modifier
-                                        .size(60.dp)
-                                        .clip(CircleShape)
-                                        .background(Color.White.copy(alpha = 0.2f))
-                                        .border(2.dp, Color.White.copy(alpha = 0.5f), CircleShape),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.AdminPanelSettings,
-                                        contentDescription = null,
-                                        tint = Color.White,
-                                        modifier = Modifier.size(32.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
+            // Simple Hero Banner
+            item {
+                RoleHeroBannerSimple(role = currentRole)
+            }
 
-                // Colorful Metrics Grid Title
-                item {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            "Overview Metrics",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
+            // Metrics Header
+            item {
+                Text(
+                    text = when (currentRole) {
+                        Role.ADMIN -> "System & Financial Overview"
+                        Role.PROJECT_HEAD -> "District Progress Overview"
+                        Role.SITE_ENGINEER -> "Field Execution Overview"
+                    },
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+
+            // Metrics Cards
+            item {
+                when (currentRole) {
+                    Role.ADMIN -> {
+                        AdminMetricsSimple(
+                            totalProjects = projectsWithDetails.size,
+                            totalBudgetStr = currencyFormatter.format(totalBudget),
+                            budgetOverrunCount = projectsWithDetails.count { pwd ->
+                                pwd.expenses.sumOf { it.amount } > pwd.project.plannedBudget
+                            },
+                            contractorsCount = contractors.size,
+                            onNavigateToProjects = onNavigateToProjects,
+                            onNavigateToContractors = onNavigateToContractors
                         )
-                        Surface(
-                            color = Color.White.copy(alpha = 0.15f),
-                            shape = CircleShape
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(8.dp)
-                                        .clip(CircleShape)
-                                        .background(Color(0xFF10B981))
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Live Data", style = MaterialTheme.typography.labelSmall, color = Color.White)
-                            }
-                        }
+                    }
+                    Role.PROJECT_HEAD -> {
+                        HeadMetricsSimple(
+                            milestoneCompletionPct = if (totalMilestones > 0) ((completedMilestones.toFloat() / totalMilestones) * 100).toInt() else 0,
+                            overdueMilestoneCount = overdueMilestones.size,
+                            delayedProjectsCount = delayedProjects,
+                            activeSupervisedSites = inProgressProjects + planningProjects,
+                            onNavigateToProjects = onNavigateToProjects
+                        )
+                    }
+                    Role.SITE_ENGINEER -> {
+                        EngineerMetricsSimple(
+                            assignedWorkOrders = allMilestones.count { !it.isCompleted },
+                            photoProofCount = completedMilestones,
+                            nearbyIssuesCount = publicIssues.size,
+                            siteSafetyStatus = "Verified",
+                            onNavigateToProjects = onNavigateToProjects
+                        )
                     }
                 }
+            }
 
-                // 2x2 Vibrant Color Summary Cards
-                item {
-                    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(14.dp)
-                        ) {
-                            ColorfulCard(
-                                title = "Total Projects",
-                                value = projectsWithDetails.size.toString(),
-                                icon = Icons.Default.AccountTree,
-                                modifier = Modifier.weight(1f),
-                                gradientColors = listOf(Color(0xFF1E3A8A), Color(0xFF3B82F6)), // Deep Royal Blue to Bright Blue
-                                iconBadgeColor = Color(0xFF60A5FA),
-                                onClick = onNavigateToProjects
-                            )
+            // Status Distribution
+            item {
+                ProjectStatusSimpleCard(
+                    completed = completedProjects,
+                    inProgress = inProgressProjects,
+                    planning = planningProjects,
+                    delayed = delayedProjects,
+                    total = projectsWithDetails.size
+                )
+            }
 
-                            ColorfulCard(
-                                title = "Total Budget",
-                                value = if (totalBudget > 0) currencyFormatter.format(totalBudget) else "₹0",
-                                icon = Icons.Default.Payments,
-                                modifier = Modifier.weight(1f),
-                                gradientColors = listOf(Color(0xFF064E3B), Color(0xFF10B981)), // Dark Emerald to Vivid Green
-                                iconBadgeColor = Color(0xFF34D399),
-                                onClick = onNavigateToProjects
-                            )
-                        }
+            // Quick Actions
+            item {
+                RoleQuickActionsSimple(
+                    role = currentRole,
+                    onNavigateToProjects = onNavigateToProjects,
+                    onNavigateToContractors = onNavigateToContractors
+                )
+            }
 
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(14.dp)
-                        ) {
-                            ColorfulCard(
-                                title = "Delayed Alerts",
-                                value = delayedProjects.toString(),
-                                icon = Icons.Default.Warning,
-                                modifier = Modifier.weight(1f),
-                                gradientColors = listOf(Color(0xFF7F1D1D), Color(0xFFEF4444)), // Crimson Red to Coral
-                                iconBadgeColor = Color(0xFFFCA5A5),
-                                onClick = onNavigateToProjects
-                            )
-
-                            ColorfulCard(
-                                title = "Contractors",
-                                value = "${contractors.size} Directory",
-                                icon = Icons.Default.Groups,
-                                modifier = Modifier.weight(1f),
-                                gradientColors = listOf(Color(0xFF4C1D95), Color(0xFF8B5CF6)), // Deep Purple to Bright Violet
-                                iconBadgeColor = Color(0xFFC4B5FD),
-                                onClick = onNavigateToContractors
-                            )
-                        }
+            // Role-Specific Detail Section
+            when (currentRole) {
+                Role.ADMIN -> {
+                    item {
+                        AdminFinancialSimpleSection(
+                            projectsWithDetails = projectsWithDetails,
+                            currencyFormatter = currencyFormatter,
+                            onProjectClick = onProjectClick
+                        )
                     }
                 }
+                Role.PROJECT_HEAD -> {
+                    item {
+                        HeadMilestoneSimpleSection(
+                            projectsWithDetails = projectsWithDetails,
+                            onProjectClick = onProjectClick
+                        )
+                    }
+                }
+                Role.SITE_ENGINEER -> {
+                    item {
+                        EngineerWorkOrdersSimpleSection(
+                            projectsWithDetails = projectsWithDetails,
+                            onProjectClick = onProjectClick
+                        )
+                    }
+                }
+            }
 
-                // Colorful Status Breakdown Progress Section
+            // Alerts Header
+            item {
+                Text(
+                    text = "Operational Alerts & Notices",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+
+            // Alerts Listing
+            val alerts = generateRoleAlerts(projectsWithDetails, currentRole)
+            if (alerts.isEmpty()) {
                 item {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(20.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.5f)),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.15f))
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                     ) {
-                        Column(modifier = Modifier.padding(18.dp)) {
-                            Text(
-                                "Project Status Distribution",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            // Multi-colored segmented bar
-                            val total = projectsWithDetails.size.coerceAtLeast(1).toFloat()
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(12.dp)
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(Color.White.copy(alpha = 0.1f))
-                            ) {
-                                if (completedProjects > 0) {
-                                    Box(
-                                        modifier = Modifier
-                                            .weight(completedProjects / total)
-                                            .fillMaxHeight()
-                                            .background(Color(0xFF10B981)) // Green
-                                    )
-                                }
-                                if (inProgressProjects > 0) {
-                                    Box(
-                                        modifier = Modifier
-                                            .weight(inProgressProjects / total)
-                                            .fillMaxHeight()
-                                            .background(Color(0xFF3B82F6)) // Blue
-                                    )
-                                }
-                                if (planningProjects > 0) {
-                                    Box(
-                                        modifier = Modifier
-                                            .weight(planningProjects / total)
-                                            .fillMaxHeight()
-                                            .background(Color(0xFFF59E0B)) // Amber
-                                    )
-                                }
-                                if (delayedProjects > 0) {
-                                    Box(
-                                        modifier = Modifier
-                                            .weight(delayedProjects / total)
-                                            .fillMaxHeight()
-                                            .background(Color(0xFFEF4444)) // Red
-                                    )
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(14.dp))
-
-                            // Status Legend Chips
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                StatusBadge(label = "Completed", count = completedProjects, color = Color(0xFF10B981))
-                                StatusBadge(label = "In Progress", count = inProgressProjects, color = Color(0xFF3B82F6))
-                                StatusBadge(label = "Planning", count = planningProjects, color = Color(0xFFF59E0B))
-                                StatusBadge(label = "Delayed", count = delayedProjects, color = Color(0xFFEF4444))
-                            }
-                        }
-                    }
-                }
-
-                // Early Warning Alerts Header
-                item {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFFEF4444).copy(alpha = 0.2f))
-                                .border(1.dp, Color(0xFFEF4444), CircleShape),
-                            contentAlignment = Alignment.Center
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
-                                imageVector = Icons.Default.NotificationsActive,
+                                Icons.Default.CheckCircle,
                                 contentDescription = null,
-                                tint = Color(0xFFEF4444),
-                                modifier = Modifier.size(20.dp)
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(24.dp)
                             )
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(
-                            "Early Warning Alerts",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                }
-
-                // Alerts Listing
-                val alerts = generateAlerts(projectsWithDetails)
-                if (alerts.isEmpty()) {
-                    item {
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(20.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFF064E3B).copy(alpha = 0.85f)),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF10B981))
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(20.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    Icons.Default.CheckCircle,
-                                    contentDescription = null,
-                                    tint = Color(0xFF34D399),
-                                    modifier = Modifier.size(32.dp)
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    "No Active Alerts",
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    style = MaterialTheme.typography.bodyLarge
                                 )
-                                Spacer(modifier = Modifier.width(16.dp))
-                                Column {
-                                    Text(
-                                        "All Systems Operational",
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White,
-                                        style = MaterialTheme.typography.titleMedium
-                                    )
-                                    Text(
-                                        "No project overruns or delayed milestones detected.",
-                                        color = Color.White.copy(alpha = 0.8f),
-                                        style = MaterialTheme.typography.bodyMedium
-                                    )
-                                }
+                                Text(
+                                    "All operations within normal parameters for ${currentRole.title}.",
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
                             }
                         }
                     }
-                } else {
-                    items(alerts) { alert ->
-                        AlertCard(alert = alert, onClick = { onProjectClick(alert.projectId) })
-                    }
                 }
-
-                item { Spacer(modifier = Modifier.height(24.dp)) }
+            } else {
+                items(alerts) { alert ->
+                    AlertCardSimple(alert = alert, onClick = { onProjectClick(alert.projectId) })
+                }
             }
+
+            item { Spacer(modifier = Modifier.height(24.dp)) }
+        }
+    }
+  }
+}
+
+@Composable
+fun RoleHeroBannerSimple(role: Role) {
+    val (badge, title, subtitle) = when (role) {
+        Role.ADMIN -> Triple("ADMINISTRATOR", "Administrator Portal", "System control, financial audits & contractor governance.")
+        Role.PROJECT_HEAD -> Triple("PROJECT HEAD", "Project Head Portal", "District schedule supervision & milestone bottleneck tracking.")
+        Role.SITE_ENGINEER -> Triple("SITE ENGINEER", "Site Engineer Portal", "Field execution logging & photo proof verification.")
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp)
+        ) {
+            Surface(
+                color = MaterialTheme.colorScheme.primaryContainer,
+                shape = RoundedCornerShape(6.dp)
+            ) {
+                Text(
+                    text = "  $badge  ",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.padding(vertical = 4.dp, horizontal = 6.dp)
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
 
 @Composable
-fun ColorfulCard(
+fun AdminMetricsSimple(
+    totalProjects: Int,
+    totalBudgetStr: String,
+    budgetOverrunCount: Int,
+    contractorsCount: Int,
+    onNavigateToProjects: () -> Unit,
+    onNavigateToContractors: () -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            SimpleMetricCard(
+                title = "Total Projects",
+                value = "$totalProjects",
+                icon = Icons.Default.AccountTree,
+                modifier = Modifier.weight(1f),
+                onClick = onNavigateToProjects
+            )
+            SimpleMetricCard(
+                title = "Total Budget",
+                value = totalBudgetStr,
+                icon = Icons.Default.Payments,
+                modifier = Modifier.weight(1f),
+                onClick = onNavigateToProjects
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            SimpleMetricCard(
+                title = "Budget Overruns",
+                value = "$budgetOverrunCount",
+                icon = Icons.Default.Warning,
+                modifier = Modifier.weight(1f),
+                onClick = onNavigateToProjects
+            )
+            SimpleMetricCard(
+                title = "Contractors",
+                value = "$contractorsCount",
+                icon = Icons.Default.Groups,
+                modifier = Modifier.weight(1f),
+                onClick = onNavigateToContractors
+            )
+        }
+    }
+}
+
+@Composable
+fun HeadMetricsSimple(
+    milestoneCompletionPct: Int,
+    overdueMilestoneCount: Int,
+    delayedProjectsCount: Int,
+    activeSupervisedSites: Int,
+    onNavigateToProjects: () -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            SimpleMetricCard(
+                title = "Milestone Progress",
+                value = "$milestoneCompletionPct%",
+                icon = Icons.Default.AssignmentTurnedIn,
+                modifier = Modifier.weight(1f),
+                onClick = onNavigateToProjects
+            )
+            SimpleMetricCard(
+                title = "Overdue Stages",
+                value = "$overdueMilestoneCount",
+                icon = Icons.Default.Timer,
+                modifier = Modifier.weight(1f),
+                onClick = onNavigateToProjects
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            SimpleMetricCard(
+                title = "Delayed Projects",
+                value = "$delayedProjectsCount",
+                icon = Icons.Default.ErrorOutline,
+                modifier = Modifier.weight(1f),
+                onClick = onNavigateToProjects
+            )
+            SimpleMetricCard(
+                title = "Active Sites",
+                value = "$activeSupervisedSites",
+                icon = Icons.Default.LocationOn,
+                modifier = Modifier.weight(1f),
+                onClick = onNavigateToProjects
+            )
+        }
+    }
+}
+
+@Composable
+fun EngineerMetricsSimple(
+    assignedWorkOrders: Int,
+    photoProofCount: Int,
+    nearbyIssuesCount: Int,
+    siteSafetyStatus: String,
+    onNavigateToProjects: () -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            SimpleMetricCard(
+                title = "Pending Work Orders",
+                value = "$assignedWorkOrders",
+                icon = Icons.Default.Engineering,
+                modifier = Modifier.weight(1f),
+                onClick = onNavigateToProjects
+            )
+            SimpleMetricCard(
+                title = "Photo Proofs",
+                value = "$photoProofCount",
+                icon = Icons.Default.PhotoCamera,
+                modifier = Modifier.weight(1f),
+                onClick = onNavigateToProjects
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            SimpleMetricCard(
+                title = "Citizen Reports",
+                value = "$nearbyIssuesCount",
+                icon = Icons.Default.ReportProblem,
+                modifier = Modifier.weight(1f),
+                onClick = onNavigateToProjects
+            )
+            SimpleMetricCard(
+                title = "Site Readiness",
+                value = siteSafetyStatus,
+                icon = Icons.Default.CheckCircle,
+                modifier = Modifier.weight(1f),
+                onClick = onNavigateToProjects
+            )
+        }
+    }
+}
+
+@Composable
+fun SimpleMetricCard(
     title: String,
     value: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
-    gradientColors: List<Color>,
-    iconBadgeColor: Color,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
     Card(
         onClick = onClick,
-        modifier = modifier.height(135.dp),
-        shape = RoundedCornerShape(22.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        modifier = modifier.height(100.dp),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Brush.linearGradient(gradientColors))
-                .padding(18.dp)
+                .padding(14.dp),
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Column(
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.SpaceBetween
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(42.dp)
-                            .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.2f))
-                            .border(1.dp, Color.White.copy(alpha = 0.4f), CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = icon,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+                Icon(
+                    imageVector = Icons.Default.ArrowForward,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.size(14.dp)
+                )
+            }
+            Column {
+                Text(
+                    text = value,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
 
-                    Icon(
-                        imageVector = Icons.Default.ArrowForward,
-                        contentDescription = "Navigate",
-                        tint = Color.White.copy(alpha = 0.6f),
-                        modifier = Modifier.size(18.dp)
-                    )
+@Composable
+fun ProjectStatusSimpleCard(
+    completed: Int,
+    inProgress: Int,
+    planning: Int,
+    delayed: Int,
+    total: Int
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                "Project Status Distribution",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+
+            val totalF = total.coerceAtLeast(1).toFloat()
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                if (completed > 0) {
+                    Box(modifier = Modifier.weight(completed / totalF).fillMaxHeight().background(MaterialTheme.colorScheme.primary))
                 }
+                if (inProgress > 0) {
+                    Box(modifier = Modifier.weight(inProgress / totalF).fillMaxHeight().background(MaterialTheme.colorScheme.secondary))
+                }
+                if (planning > 0) {
+                    Box(modifier = Modifier.weight(planning / totalF).fillMaxHeight().background(MaterialTheme.colorScheme.tertiary))
+                }
+                if (delayed > 0) {
+                    Box(modifier = Modifier.weight(delayed / totalF).fillMaxHeight().background(MaterialTheme.colorScheme.error))
+                }
+            }
 
-                Column {
-                    Text(
-                        value,
-                        style = MaterialTheme.typography.headlineMedium.copy(fontSize = 22.sp),
-                        fontWeight = FontWeight.Black,
-                        color = Color.White
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        title,
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color.White.copy(alpha = 0.85f)
-                    )
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                StatusItemSimple(label = "Completed", count = completed)
+                StatusItemSimple(label = "In Progress", count = inProgress)
+                StatusItemSimple(label = "Planning", count = planning)
+                StatusItemSimple(label = "Delayed", count = delayed)
+            }
+        }
+    }
+}
+
+@Composable
+fun StatusItemSimple(label: String, count: Int) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = "$count",
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+fun RoleQuickActionsSimple(
+    role: Role,
+    onNavigateToProjects: () -> Unit,
+    onNavigateToContractors: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "Quick Actions",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                when (role) {
+                    Role.ADMIN -> {
+                        SimpleActionButton(label = "Projects", icon = Icons.Default.AccountTree, modifier = Modifier.weight(1f), onClick = onNavigateToProjects)
+                        SimpleActionButton(label = "Contractors", icon = Icons.Default.Groups, modifier = Modifier.weight(1f), onClick = onNavigateToContractors)
+                        SimpleActionButton(label = "Add Project", icon = Icons.Default.Add, modifier = Modifier.weight(1f), onClick = onNavigateToProjects)
+                    }
+                    Role.PROJECT_HEAD -> {
+                        SimpleActionButton(label = "Milestones", icon = Icons.Default.AssignmentTurnedIn, modifier = Modifier.weight(1f), onClick = onNavigateToProjects)
+                        SimpleActionButton(label = "Delays", icon = Icons.Default.Warning, modifier = Modifier.weight(1f), onClick = onNavigateToProjects)
+                        SimpleActionButton(label = "Projects", icon = Icons.Default.AccountTree, modifier = Modifier.weight(1f), onClick = onNavigateToProjects)
+                    }
+                    Role.SITE_ENGINEER -> {
+                        SimpleActionButton(label = "Work Orders", icon = Icons.Default.Engineering, modifier = Modifier.weight(1f), onClick = onNavigateToProjects)
+                        SimpleActionButton(label = "Photo Proof", icon = Icons.Default.PhotoCamera, modifier = Modifier.weight(1f), onClick = onNavigateToProjects)
+                        SimpleActionButton(label = "Issues", icon = Icons.Default.ReportProblem, modifier = Modifier.weight(1f), onClick = onNavigateToProjects)
+                    }
                 }
             }
         }
@@ -500,118 +681,395 @@ fun ColorfulCard(
 }
 
 @Composable
-fun StatusBadge(label: String, count: Int, color: Color) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            modifier = Modifier
-                .size(10.dp)
-                .clip(CircleShape)
-                .background(color)
-        )
-        Spacer(modifier = Modifier.width(6.dp))
-        Text(
-            "$label ($count)",
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.Bold,
-            color = Color.White.copy(alpha = 0.9f)
-        )
+fun SimpleActionButton(
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = modifier.clickable { onClick() },
+        shape = RoundedCornerShape(10.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Row(
+            modifier = Modifier.padding(vertical = 10.dp, horizontal = 8.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(imageVector = icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = label,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
     }
 }
 
-data class DashboardAlert(val projectId: Int, val projectName: String, val message: String, val severity: String) // "High", "Medium"
+@Composable
+fun AdminFinancialSimpleSection(
+    projectsWithDetails: List<ProjectWithDetails>,
+    currencyFormatter: NumberFormat,
+    onProjectClick: (Int) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                "Budget vs Actual Audit",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.height(10.dp))
 
-fun generateAlerts(projects: List<ProjectWithDetails>): List<DashboardAlert> {
-    val alerts = mutableListOf<DashboardAlert>()
-    val now = System.currentTimeMillis()
+            projectsWithDetails.take(4).forEach { pwd ->
+                val spent = pwd.expenses.sumOf { it.amount }
+                val budget = pwd.project.plannedBudget
+                val isOverrun = spent > budget
 
-    for (p in projects) {
-        val actualSpend = p.expenses.sumOf { it.amount }
-        if (actualSpend > p.project.plannedBudget) {
-            alerts.add(DashboardAlert(p.project.id, p.project.name, "Budget Overrun: Actual spend exceeds planned budget.", "High"))
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onProjectClick(pwd.project.id) }
+                        .padding(vertical = 6.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(pwd.project.name, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, fontSize = 13.sp)
+                        Text(
+                            text = if (isOverrun) "Over Budget" else "On Track",
+                            color = if (isOverrun) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 11.sp
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        "Spent: ${currencyFormatter.format(spent)} / Budget: ${currencyFormatter.format(budget)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+            }
         }
+    }
+}
 
-        val overdueMilestones = p.milestones.filter { !it.isCompleted && it.expectedCompletionDate < now }
-        if (overdueMilestones.isNotEmpty()) {
-            alerts.add(DashboardAlert(p.project.id, p.project.name, "${overdueMilestones.size} Overdue Milestone(s).", "Medium"))
+@Composable
+fun HeadMilestoneSimpleSection(
+    projectsWithDetails: List<ProjectWithDetails>,
+    onProjectClick: (Int) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                "Milestone Stage Overview",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+
+            projectsWithDetails.take(4).forEach { pwd ->
+                val totalM = pwd.milestones.size
+                val compM = pwd.milestones.count { it.isCompleted }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onProjectClick(pwd.project.id) }
+                        .padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(pwd.project.name, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, fontSize = 13.sp)
+                        Text("$compM of $totalM Stages Completed", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+            }
+        }
+    }
+}
+
+@Composable
+fun EngineerWorkOrdersSimpleSection(
+    projectsWithDetails: List<ProjectWithDetails>,
+    onProjectClick: (Int) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                "Active Field Work Orders",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+
+            val uncompleted = projectsWithDetails.flatMap { pwd ->
+                pwd.milestones.filter { !it.isCompleted }.map { m -> Pair(pwd.project, m) }
+            }
+
+            if (uncompleted.isEmpty()) {
+                Text("No pending work orders.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else {
+                uncompleted.take(4).forEach { (project, milestone) ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onProjectClick(project.id) }
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(milestone.title, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, fontSize = 13.sp)
+                            Text("Site: ${project.name}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer
+                        ) {
+                            Text(
+                                "Verify",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                }
+            }
+        }
+    }
+}
+
+data class DashboardAlert(val projectId: Int, val projectName: String, val message: String, val severity: String)
+
+fun generateRoleAlerts(projects: List<ProjectWithDetails>, role: Role): List<DashboardAlert> {
+    val alerts = mutableListOf<DashboardAlert>()
+    for (pwd in projects) {
+        val spent = pwd.expenses.sumOf { it.amount }
+        val budget = pwd.project.plannedBudget
+        val overdueMilestones = pwd.milestones.filter { !it.isCompleted && it.expectedCompletionDate < System.currentTimeMillis() }
+
+        when (role) {
+            Role.ADMIN -> {
+                if (spent > budget) {
+                    alerts.add(DashboardAlert(pwd.project.id, pwd.project.name, "Budget exceeded by ₹${spent - budget}", "High"))
+                }
+            }
+            Role.PROJECT_HEAD -> {
+                if (overdueMilestones.isNotEmpty() || pwd.project.status == "Delayed") {
+                    alerts.add(DashboardAlert(pwd.project.id, pwd.project.name, "${overdueMilestones.size} milestone stages overdue", "Warning"))
+                }
+            }
+            Role.SITE_ENGINEER -> {
+                if (pwd.project.status == "Delayed" || overdueMilestones.isNotEmpty()) {
+                    alerts.add(DashboardAlert(pwd.project.id, pwd.project.name, "Action required on pending site tasks", "Warning"))
+                }
+            }
         }
     }
     return alerts
 }
 
 @Composable
-fun AlertCard(alert: DashboardAlert, onClick: () -> Unit) {
-    val isHigh = alert.severity == "High"
-    val cardBg = if (isHigh) Color(0xFF450A0A).copy(alpha = 0.9f) else Color(0xFF451A03).copy(alpha = 0.9f)
-    val accentBorder = if (isHigh) Color(0xFFEF4444) else Color(0xFFF59E0B)
-    val iconTint = if (isHigh) Color(0xFFFCA5A5) else Color(0xFFFDE68A)
-
+fun AlertCardSimple(alert: DashboardAlert, onClick: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = cardBg),
-        border = androidx.compose.foundation.BorderStroke(1.dp, accentBorder)
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(18.dp),
+                .padding(14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .size(46.dp)
-                    .clip(CircleShape)
-                    .background(accentBorder.copy(alpha = 0.25f))
-                    .border(1.dp, accentBorder, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = if (isHigh) Icons.Default.Error else Icons.Default.Warning,
-                    contentDescription = null,
-                    tint = iconTint,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-            Spacer(modifier = Modifier.width(16.dp))
+            Icon(
+                imageVector = if (alert.severity == "High") Icons.Default.Error else Icons.Default.Warning,
+                contentDescription = null,
+                tint = if (alert.severity == "High") MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Surface(
-                        color = accentBorder,
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text(
-                            text = if (isHigh) " HIGH " else " WARNING ",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Black,
-                            color = Color.Black,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        alert.projectName,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                }
-                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    alert.projectName,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    style = MaterialTheme.typography.bodyMedium
+                )
                 Text(
                     alert.message,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = 0.85f)
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            Spacer(modifier = Modifier.width(8.dp))
             Icon(
                 Icons.Default.ChevronRight,
-                contentDescription = "View Details",
-                tint = Color.White.copy(alpha = 0.7f)
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(16.dp)
             )
         }
     }
 }
 
+@Composable
+fun GramVikasDrawerContent(
+    currentRole: Role,
+    onNavigateToDailyReports: () -> Unit,
+    onNavigateToProjects: () -> Unit,
+    onNavigateToContractors: () -> Unit,
+    onNavigateToIssues: () -> Unit,
+    onNavigateToSettings: () -> Unit,
+    onLogout: () -> Unit,
+    onCloseDrawer: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxHeight()
+            .width(300.dp)
+            .background(MaterialTheme.colorScheme.surface)
+            .padding(16.dp)
+    ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(vertical = 12.dp)
+            ) {
+                Surface(
+                    modifier = Modifier.size(42.dp),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primaryContainer
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.Agriculture,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text(
+                        "GramVikas Portal",
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontSize = 16.sp
+                    )
+                    Text(
+                        currentRole.title,
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(modifier = Modifier.height(12.dp))
 
+            NavigationDrawerItem(
+                icon = { Icon(Icons.Default.Dashboard, contentDescription = null) },
+                label = { Text("Dashboard", fontWeight = FontWeight.Bold) },
+                selected = true,
+                onClick = onCloseDrawer
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            NavigationDrawerItem(
+                icon = { Icon(Icons.Default.Assignment, contentDescription = null) },
+                label = { Text("Daily Update Report", fontWeight = FontWeight.Bold) },
+                selected = false,
+                onClick = {
+                    onCloseDrawer()
+                    onNavigateToDailyReports()
+                }
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            NavigationDrawerItem(
+                icon = { Icon(Icons.Default.AccountTree, contentDescription = null) },
+                label = { Text("Projects & Sites") },
+                selected = false,
+                onClick = {
+                    onCloseDrawer()
+                    onNavigateToProjects()
+                }
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            NavigationDrawerItem(
+                icon = { Icon(Icons.Default.Groups, contentDescription = null) },
+                label = { Text("Contractors & Labor") },
+                selected = false,
+                onClick = {
+                    onCloseDrawer()
+                    onNavigateToContractors()
+                }
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            NavigationDrawerItem(
+                icon = { Icon(Icons.Default.ReportProblem, contentDescription = null) },
+                label = { Text("Citizen Reports / Issues") },
+                selected = false,
+                onClick = {
+                    onCloseDrawer()
+                    onNavigateToIssues()
+                }
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            NavigationDrawerItem(
+                icon = { Icon(Icons.Default.Settings, contentDescription = null) },
+                label = { Text("Settings") },
+                selected = false,
+                onClick = {
+                    onCloseDrawer()
+                    onNavigateToSettings()
+                }
+            )
+
+            Spacer(modifier = Modifier.weight(1f))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(modifier = Modifier.height(12.dp))
+
+            NavigationDrawerItem(
+                icon = { Icon(Icons.Default.Logout, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+                label = { Text("Logout", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold) },
+                selected = false,
+                onClick = {
+                    onCloseDrawer()
+                    onLogout()
+                }
+            )
+        }
+    }

@@ -48,8 +48,9 @@ fun GramVikasApp(repository: GramVikasRepository) {
         }
         composable("login") {
             com.example.ui.login.LoginScreen(
-                onLoginSuccess = { 
-                    navController.navigate("projects") {
+                onLoginSuccess = { role ->
+                    viewModel.setCurrentRole(role)
+                    navController.navigate("dashboard") {
                         popUpTo("public_home")
                     }
                 },
@@ -61,7 +62,17 @@ fun GramVikasApp(repository: GramVikasRepository) {
                 viewModel = viewModel,
                 onNavigateToProjects = { navController.navigate("projects") },
                 onNavigateToContractors = { navController.navigate("contractors") },
-                onProjectClick = { projectId -> navController.navigate("project_details/$projectId") }
+                onProjectClick = { projectId -> navController.navigate("project_details/$projectId") },
+                onNavigateToDailyReports = { navController.navigate("daily_reports") },
+                onNavigateToIssues = { navController.navigate("issues") },
+                onNavigateToSettings = { navController.navigate("settings") },
+                onLogout = { navController.popBackStack("public_home", inclusive = false) }
+            )
+        }
+        composable("daily_reports") {
+            com.example.ui.reports.DailyUpdateReportScreen(
+                viewModel = viewModel,
+                onBack = { navController.popBackStack() }
             )
         }
         composable("projects") {

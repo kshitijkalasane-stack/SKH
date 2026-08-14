@@ -32,6 +32,7 @@ class GramVikasRepository(private val dao: GramVikasDao) {
     }
 
     val allPublicIssues: Flow<List<PublicIssue>> = dao.getAllPublicIssues()
+    val allDailyReports: Flow<List<DailyReport>> = dao.getAllDailyReports()
 
     suspend fun insertContractor(contractor: Contractor) {
         dao.insertContractor(contractor)
@@ -39,5 +40,9 @@ class GramVikasRepository(private val dao: GramVikasDao) {
 
     suspend fun insertPublicIssue(issue: PublicIssue) {
         dao.insertPublicIssue(issue)
+    }
+
+    suspend fun insertDailyReport(report: DailyReport) {
+        dao.insertDailyReport(report)
     }
 }
