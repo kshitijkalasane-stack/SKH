@@ -1,0 +1,6 @@
+{
+  "name": "GramVikas",
+  "description": "Phase-wise Development Monitoring and Governance System",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
